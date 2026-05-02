@@ -35,6 +35,7 @@
     <button class="tab-btn" data-tab="compare">比較</button>
     <button class="tab-btn" data-tab="docs">ES/面接</button>
     <button class="tab-btn" data-tab="profile">プロフィール</button>
+    <button class="tab-btn" data-tab="privacy">プライバシー</button>
     <button class="tab-btn" data-tab="guide">使い方</button>
   </nav>
 
@@ -58,6 +59,13 @@
           <p id="statQuests">0 / 0</p>
         </article>
       </div>
+      <section class="panel today-panel">
+        <div class="inline-header">
+          <h2>今日やること</h2>
+          <button id="addSampleDataBtn" class="ghost">サンプルデータを入れる</button>
+        </div>
+        <ul id="todayTodoList" class="list action-list"></ul>
+      </section>
       <div class="two-col">
         <section class="panel">
           <h2>未完了クエスト</h2>
@@ -74,6 +82,12 @@
       <div class="two-col">
         <section class="panel">
           <h2>企業一覧</h2>
+          <div class="filter-bar">
+            <label>検索<input id="companySearch" type="search" placeholder="企業名・業界・職種・メモ"></label>
+            <label>分類<select id="companyFilterStatus"><option value="">すべて</option></select></label>
+            <label>選考<select id="companyFilterApplication"><option value="">すべて</option></select></label>
+            <button id="clearCompanyFiltersBtn" class="ghost">クリア</button>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -83,6 +97,8 @@
                   <th>分類</th>
                   <th>業界</th>
                   <th>職種</th>
+                  <th>選考</th>
+                  <th>次の予定</th>
                   <th>志望度</th>
                 </tr>
               </thead>
@@ -100,6 +116,12 @@
             <label>分類
               <select id="companyStatus"></select>
             </label>
+            <label>選考ステータス
+              <select id="companyApplicationStatus"></select>
+            </label>
+            <label>ES締切<input id="companyDeadlineDate" type="date"></label>
+            <label>次の予定日<input id="companyNextEventDate" type="date"></label>
+            <label>次の予定名<input id="companyNextEventName" type="text" maxlength="120" placeholder="一次面接、説明会など"></label>
           </div>
           <div class="range-grid">
             <label>理解度 <input id="companyUnderstanding" type="range" min="0" max="5" step="1"><span id="companyUnderstandingValue">0</span></label>
@@ -214,8 +236,12 @@
           <label>企業
             <select id="docsCompanySelect"></select>
           </label>
-          <button id="genMotivationBtn">志望動機骨子を生成</button>
+          <label>出力形式
+            <select id="motivationModeSelect"></select>
+          </label>
+          <button id="genMotivationBtn">志望動機を生成</button>
           <button id="genInterviewBtn" class="ghost">面接前30秒復習</button>
+          <button id="genReverseQuestionsBtn" class="ghost">逆質問メーカー</button>
         </div>
         <div class="inline-header">
           <label>ローカルAIモデル
@@ -249,6 +275,31 @@
         <div class="button-row">
           <button id="saveProfileBtn">プロフィール保存</button>
         </div>
+      </div>
+    </section>
+
+    <section id="tab-privacy" class="tab-panel">
+      <div class="two-col">
+        <section class="panel">
+          <h2>プライバシーと保存</h2>
+          <ul class="guide-list">
+            <li>未ログイン時の入力内容は、このブラウザのlocalStorageに保存されます。</li>
+            <li>Googleログイン中は、本人のFirebaseユーザー領域にも保存・同期されます。</li>
+            <li>友達と同じURLを開いても、データはユーザーごとに分かれます。</li>
+            <li>採用資料や社員インタビューを貼る場合は、必要な範囲にとどめ、出典を残してください。</li>
+            <li>他人の個人情報、非公開情報、企業の機密情報は入力しないでください。</li>
+          </ul>
+        </section>
+        <section class="panel">
+          <h2>データ管理</h2>
+          <p class="panel-copy">クラウドとこの端末の保存は別々に削除できます。心配なときは先にJSONエクスポートでバックアップしてください。</p>
+          <div class="button-row">
+            <button id="deleteCloudDataBtn" class="danger">クラウドデータ削除</button>
+            <button id="clearLocalDataBtn" class="danger">この端末のデータ削除</button>
+            <button id="feedbackBtn" class="ghost">フィードバックを送る</button>
+            <button id="openTermsFromPrivacyBtn" class="ghost">利用前の確認を表示</button>
+          </div>
+        </section>
       </div>
     </section>
 
@@ -349,6 +400,36 @@
       <div class="terms-actions">
         <button id="termsAcceptBtn" disabled>確認して使い始める</button>
         <button id="termsCloseBtn" class="ghost">閉じる</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="onboardingModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+    <section class="terms-modal">
+      <div class="terms-header onboarding-header">
+        <p>初回セットアップ</p>
+        <h2 id="onboardingTitle">3分で推しカンを起動しよう</h2>
+      </div>
+      <div class="terms-body">
+        <div class="onboarding-grid">
+          <article>
+            <strong>1. 企業を1社入れる</strong>
+            <p>推し棚で、気になる会社名・業界・職種・締切を入れます。</p>
+          </article>
+          <article>
+            <strong>2. 推しポイントを書く</strong>
+            <p>カードに「好きな理由」と「気になる不安」をメモします。</p>
+          </article>
+          <article>
+            <strong>3. 今日やることを見る</strong>
+            <p>ホームで締切・予定・未完了クエストを確認できます。</p>
+          </article>
+        </div>
+      </div>
+      <div class="terms-actions">
+        <button id="startOnboardingBtn">推し棚から始める</button>
+        <button id="onboardingSampleBtn" class="ghost">サンプルで試す</button>
+        <button id="skipOnboardingBtn" class="ghost">あとで見る</button>
       </div>
     </section>
   </div>

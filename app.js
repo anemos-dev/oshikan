@@ -8,6 +8,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import {
+  deleteDoc,
   doc,
   getDoc,
   getFirestore,
@@ -34,7 +35,15 @@ const db = getFirestore(firebaseApp);
 const googleProvider = new GoogleAuthProvider();
 
 const STATUS_OPTIONS = ["気になる", "推し", "本命", "比較中", "保留", "卒業"];
+const APPLICATION_STATUS_OPTIONS = ["未応募", "説明会予定", "ES準備中", "ES提出済み", "一次面接", "二次面接", "最終面接", "内定", "辞退", "不合格"];
 const CARD_TYPES = ["推しポイント", "モヤモヤ"];
+const MOTIVATION_MODES = [
+  { value: "outline", label: "骨子" },
+  { value: "200", label: "200字" },
+  { value: "400", label: "400字" },
+  { value: "600", label: "600字" },
+  { value: "interview", label: "面接30秒" },
+];
 const QUEST_LIBRARY = [
   { title: "主力事業を1つ説明する", detail: "企業の主力事業を自分の言葉で100字以内にまとめる", category: "事業理解" },
   { title: "競合を2社調べる", detail: "同業他社との違いを2つ書く", category: "比較" },
@@ -80,6 +89,7 @@ const defaultState = {
     termsAcceptedAt: "",
     cloudUserId: "",
     cloudLastSyncedAt: "",
+    onboardingSeen: false,
   },
 };
 
@@ -108,12 +118,22 @@ const els = {
   statQuests: document.getElementById("statQuests"),
   homeQuestList: document.getElementById("homeQuestList"),
   homeCardList: document.getElementById("homeCardList"),
+  todayTodoList: document.getElementById("todayTodoList"),
+  addSampleDataBtn: document.getElementById("addSampleDataBtn"),
   companyTableBody: document.getElementById("companyTableBody"),
+  companySearch: document.getElementById("companySearch"),
+  companyFilterStatus: document.getElementById("companyFilterStatus"),
+  companyFilterApplication: document.getElementById("companyFilterApplication"),
+  clearCompanyFiltersBtn: document.getElementById("clearCompanyFiltersBtn"),
   companyName: document.getElementById("companyName"),
   companyIndustry: document.getElementById("companyIndustry"),
   companyRole: document.getElementById("companyRole"),
   companyUrl: document.getElementById("companyUrl"),
   companyStatus: document.getElementById("companyStatus"),
+  companyApplicationStatus: document.getElementById("companyApplicationStatus"),
+  companyDeadlineDate: document.getElementById("companyDeadlineDate"),
+  companyNextEventDate: document.getElementById("companyNextEventDate"),
+  companyNextEventName: document.getElementById("companyNextEventName"),
   companyUnderstanding: document.getElementById("companyUnderstanding"),
   companyEmpathy: document.getElementById("companyEmpathy"),
   companyFit: document.getElementById("companyFit"),
@@ -149,8 +169,10 @@ const els = {
   runCompareBtn: document.getElementById("runCompareBtn"),
   compareOutput: document.getElementById("compareOutput"),
   docsCompanySelect: document.getElementById("docsCompanySelect"),
+  motivationModeSelect: document.getElementById("motivationModeSelect"),
   genMotivationBtn: document.getElementById("genMotivationBtn"),
   genInterviewBtn: document.getElementById("genInterviewBtn"),
+  genReverseQuestionsBtn: document.getElementById("genReverseQuestionsBtn"),
   ollamaModelInput: document.getElementById("ollamaModelInput"),
   improveLocalAiBtn: document.getElementById("improveLocalAiBtn"),
   docsOutput: document.getElementById("docsOutput"),
@@ -166,6 +188,14 @@ const els = {
   termsAgreeCheck: document.getElementById("termsAgreeCheck"),
   termsAcceptBtn: document.getElementById("termsAcceptBtn"),
   termsCloseBtn: document.getElementById("termsCloseBtn"),
+  deleteCloudDataBtn: document.getElementById("deleteCloudDataBtn"),
+  clearLocalDataBtn: document.getElementById("clearLocalDataBtn"),
+  feedbackBtn: document.getElementById("feedbackBtn"),
+  openTermsFromPrivacyBtn: document.getElementById("openTermsFromPrivacyBtn"),
+  onboardingModal: document.getElementById("onboardingModal"),
+  startOnboardingBtn: document.getElementById("startOnboardingBtn"),
+  onboardingSampleBtn: document.getElementById("onboardingSampleBtn"),
+  skipOnboardingBtn: document.getElementById("skipOnboardingBtn"),
 };
 
 init();
@@ -183,7 +213,11 @@ function init() {
 
 function renderStaticSelects() {
   els.companyStatus.innerHTML = STATUS_OPTIONS.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+  els.companyFilterStatus.innerHTML = `<option value="">すべて</option>${STATUS_OPTIONS.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("")}`;
+  els.companyApplicationStatus.innerHTML = APPLICATION_STATUS_OPTIONS.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+  els.companyFilterApplication.innerHTML = `<option value="">すべて</option>${APPLICATION_STATUS_OPTIONS.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("")}`;
   els.cardType.innerHTML = CARD_TYPES.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+  els.motivationModeSelect.innerHTML = MOTIVATION_MODES.map((m) => `<option value="${m.value}">${escapeHtml(m.label)}</option>`).join("");
 }
 
 function bindEvents() {
@@ -203,6 +237,16 @@ function bindEvents() {
   els.companyClearBtn.addEventListener("click", () => {
     ui.selectedCompanyId = null;
     fillCompanyForm(null);
+    renderCompanyTable();
+  });
+  [els.companySearch, els.companyFilterStatus, els.companyFilterApplication].forEach((input) => {
+    input.addEventListener("input", renderCompanyTable);
+    input.addEventListener("change", renderCompanyTable);
+  });
+  els.clearCompanyFiltersBtn.addEventListener("click", () => {
+    els.companySearch.value = "";
+    els.companyFilterStatus.value = "";
+    els.companyFilterApplication.value = "";
     renderCompanyTable();
   });
 
@@ -250,6 +294,7 @@ function bindEvents() {
 
   els.genMotivationBtn.addEventListener("click", generateMotivation);
   els.genInterviewBtn.addEventListener("click", generateInterviewSheet);
+  els.genReverseQuestionsBtn.addEventListener("click", generateReverseQuestions);
   els.improveLocalAiBtn.addEventListener("click", improveWithLocalAi);
   els.docsOutput.addEventListener("input", () => {
     state.appState.docsDraft = els.docsOutput.value;
@@ -262,6 +307,7 @@ function bindEvents() {
 
   els.saveProfileBtn.addEventListener("click", saveProfile);
   els.openTermsBtn.addEventListener("click", () => showTermsModal(false));
+  els.openTermsFromPrivacyBtn.addEventListener("click", () => showTermsModal(false));
   els.termsAgreeCheck.addEventListener("change", () => {
     els.termsAcceptBtn.disabled = !els.termsAgreeCheck.checked;
   });
@@ -282,11 +328,26 @@ function bindEvents() {
   els.importFileInput.addEventListener("change", importJson);
   els.loginBtn.addEventListener("click", loginWithGoogle);
   els.logoutBtn.addEventListener("click", logoutFromGoogle);
+  els.addSampleDataBtn.addEventListener("click", addSampleData);
+  els.deleteCloudDataBtn.addEventListener("click", deleteCloudData);
+  els.clearLocalDataBtn.addEventListener("click", clearLocalData);
+  els.feedbackBtn.addEventListener("click", openFeedback);
+  els.startOnboardingBtn.addEventListener("click", () => {
+    finishOnboarding();
+    setTab("companies", true);
+  });
+  els.onboardingSampleBtn.addEventListener("click", () => {
+    addSampleData();
+    finishOnboarding();
+  });
+  els.skipOnboardingBtn.addEventListener("click", finishOnboarding);
 }
 
 function maybeShowTermsModal() {
   if (Number(state.appState.termsVersion || 0) < TERMS_VERSION) {
     showTermsModal(true);
+  } else {
+    maybeShowOnboarding();
   }
 }
 
@@ -302,11 +363,23 @@ function hideTermsModal() {
   els.termsModal.classList.add("hidden");
 }
 
+function maybeShowOnboarding() {
+  if (state.appState.onboardingSeen || hasUserData(state)) return;
+  els.onboardingModal.classList.remove("hidden");
+}
+
+function finishOnboarding() {
+  state.appState.onboardingSeen = true;
+  saveState();
+  els.onboardingModal.classList.add("hidden");
+}
+
 function acceptTerms() {
   state.appState.termsVersion = TERMS_VERSION;
   state.appState.termsAcceptedAt = nowIso();
   saveState();
   hideTermsModal();
+  maybeShowOnboarding();
 }
 
 function watchAuthState() {
@@ -492,6 +565,14 @@ function renderHome() {
   els.statCards.textContent = String(totalCards);
   els.statQuests.textContent = `${doneQuests} / ${totalQuests}`;
 
+  const todos = buildTodayTodos();
+  els.todayTodoList.innerHTML = todos
+    .map((todo) => `<li><span class="todo-badge ${todo.tone}">${escapeHtml(todo.badge)}</span><span>${todo.html}</span></li>`)
+    .join("");
+  if (!todos.length) {
+    els.todayTodoList.innerHTML = "<li><span class=\"todo-badge soft\">OK</span><span>急ぎの予定はありません。気になる企業を1社だけ深掘りしてみましょう。</span></li>";
+  }
+
   const pendingQuests = [...state.quests]
     .filter((q) => !q.isDone)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -520,8 +601,65 @@ function renderHome() {
   }
 }
 
+function buildTodayTodos() {
+  const todos = [];
+  state.companies.forEach((company) => {
+    const deadlineDays = daysUntil(company.deadlineDate);
+    if (deadlineDays !== null && deadlineDays >= 0 && deadlineDays <= 7) {
+      todos.push({
+        badge: deadlineDays === 0 ? "今日締切" : `${deadlineDays}日後`,
+        tone: deadlineDays <= 1 ? "" : "soft",
+        sort: deadlineDays,
+        html: `${escapeHtml(company.name)} のES締切を確認する（${escapeHtml(company.deadlineDate)}）`,
+      });
+    }
+    const eventDays = daysUntil(company.nextEventDate);
+    if (eventDays !== null && eventDays >= 0 && eventDays <= 7) {
+      todos.push({
+        badge: eventDays === 0 ? "今日予定" : `${eventDays}日後`,
+        tone: "calm",
+        sort: eventDays + 0.2,
+        html: `${escapeHtml(company.name)}: ${escapeHtml(company.nextEventName || "次の予定")}（${escapeHtml(company.nextEventDate)}）`,
+      });
+    }
+    const hasCards = state.cards.some((card) => card.companyId === company.id);
+    if (!hasCards && todos.length < 12) {
+      todos.push({
+        badge: "カード",
+        tone: "soft",
+        sort: 20,
+        html: `${escapeHtml(company.name)} の推しポイントを1つカードにする`,
+      });
+    }
+  });
+
+  state.quests
+    .filter((q) => !q.isDone)
+    .slice(-8)
+    .forEach((quest) => {
+      const company = getCompanyById(quest.companyId);
+      todos.push({
+        badge: "研究",
+        tone: "calm",
+        sort: 30,
+        html: `${escapeHtml(company ? company.name : "不明")}: ${escapeHtml(quest.title)}`,
+      });
+    });
+
+  return todos.sort((a, b) => a.sort - b.sort).slice(0, 10);
+}
+
 function renderCompanyTable() {
-  const sorted = [...state.companies].sort((a, b) => {
+  const keyword = els.companySearch.value.trim().toLowerCase();
+  const filterStatus = els.companyFilterStatus.value;
+  const filterApplication = els.companyFilterApplication.value;
+  const sorted = [...state.companies].filter((c) => {
+    const haystack = [c.name, c.industry, c.role, c.notes, c.applicationStatus].join(" ").toLowerCase();
+    if (keyword && !haystack.includes(keyword)) return false;
+    if (filterStatus && c.status !== filterStatus) return false;
+    if (filterApplication && c.applicationStatus !== filterApplication) return false;
+    return true;
+  }).sort((a, b) => {
     const order = STATUS_OPTIONS.indexOf(a.status) - STATUS_OPTIONS.indexOf(b.status);
     if (order !== 0) return order;
     return b.updatedAt.localeCompare(a.updatedAt);
@@ -529,23 +667,40 @@ function renderCompanyTable() {
   els.companyTableBody.innerHTML = sorted
     .map((c) => {
       const selected = c.id === ui.selectedCompanyId ? "selected" : "";
+      const nextEvent = formatCompanyNextEvent(c);
       return `<tr class="${selected}" data-id="${c.id}">
-        <td>${c.id}</td>
-        <td>${escapeHtml(c.name)}</td>
-        <td>${escapeHtml(c.status)}</td>
-        <td>${escapeHtml(c.industry)}</td>
-        <td>${escapeHtml(c.role)}</td>
-        <td>${c.interest}</td>
+        <td data-label="ID">${c.id}</td>
+        <td data-label="企業名">${escapeHtml(c.name)}</td>
+        <td data-label="分類">${escapeHtml(c.status)}</td>
+        <td data-label="業界">${escapeHtml(c.industry)}</td>
+        <td data-label="職種">${escapeHtml(c.role)}</td>
+        <td data-label="選考">${escapeHtml(c.applicationStatus)}</td>
+        <td data-label="次の予定">${escapeHtml(nextEvent)}</td>
+        <td data-label="志望度">${c.interest}</td>
       </tr>`;
     })
     .join("");
+  if (!sorted.length) {
+    els.companyTableBody.innerHTML = `<tr><td data-label="結果" colspan="8">条件に合う企業がありません。</td></tr>`;
+  }
 
   [...els.companyTableBody.querySelectorAll("tr")].forEach((row) => {
     row.addEventListener("click", () => {
       const id = Number(row.dataset.id);
+      if (!Number.isFinite(id)) return;
       selectCompany(id);
     });
   });
+}
+
+function formatCompanyNextEvent(company) {
+  if (company.nextEventDate) {
+    return `${company.nextEventDate} ${company.nextEventName || "予定"}`;
+  }
+  if (company.deadlineDate) {
+    return `ES締切 ${company.deadlineDate}`;
+  }
+  return "-";
 }
 
 function selectCompany(id) {
@@ -568,6 +723,10 @@ function fillCompanyForm(company) {
     role: "",
     url: "",
     status: STATUS_OPTIONS[0],
+    applicationStatus: APPLICATION_STATUS_OPTIONS[0],
+    deadlineDate: "",
+    nextEventDate: "",
+    nextEventName: "",
     understanding: 0,
     empathy: 0,
     fit: 0,
@@ -580,6 +739,10 @@ function fillCompanyForm(company) {
   els.companyRole.value = c.role;
   els.companyUrl.value = c.url;
   els.companyStatus.value = c.status;
+  els.companyApplicationStatus.value = c.applicationStatus || APPLICATION_STATUS_OPTIONS[0];
+  els.companyDeadlineDate.value = c.deadlineDate || "";
+  els.companyNextEventDate.value = c.nextEventDate || "";
+  els.companyNextEventName.value = c.nextEventName || "";
   els.companyUnderstanding.value = String(c.understanding);
   els.companyEmpathy.value = String(c.empathy);
   els.companyFit.value = String(c.fit);
@@ -600,6 +763,10 @@ function collectCompanyForm() {
     role: els.companyRole.value.trim(),
     url: els.companyUrl.value.trim(),
     status: els.companyStatus.value || STATUS_OPTIONS[0],
+    applicationStatus: els.companyApplicationStatus.value || APPLICATION_STATUS_OPTIONS[0],
+    deadlineDate: els.companyDeadlineDate.value,
+    nextEventDate: els.companyNextEventDate.value,
+    nextEventName: els.companyNextEventName.value.trim(),
     understanding: Number(els.companyUnderstanding.value),
     empathy: Number(els.companyEmpathy.value),
     fit: Number(els.companyFit.value),
@@ -730,11 +897,11 @@ function renderCardsTable() {
     .map((c) => {
       const selected = c.id === ui.selectedCardId ? "selected" : "";
       return `<tr class="${selected}" data-id="${c.id}">
-        <td>${c.id}</td>
-        <td>${escapeHtml(c.cardType)}</td>
-        <td>${escapeHtml(c.title)}</td>
-        <td>${escapeHtml(c.source || "-")}</td>
-        <td>${escapeHtml(formatDate(c.createdAt))}</td>
+        <td data-label="ID">${c.id}</td>
+        <td data-label="種類">${escapeHtml(c.cardType)}</td>
+        <td data-label="タイトル">${escapeHtml(c.title)}</td>
+        <td data-label="情報源">${escapeHtml(c.source || "-")}</td>
+        <td data-label="作成日">${escapeHtml(formatDate(c.createdAt))}</td>
       </tr>`;
     })
     .join("");
@@ -834,11 +1001,11 @@ function renderQuestTable() {
     .map((q) => {
       const selected = q.id === ui.selectedQuestId ? "selected" : "";
       return `<tr class="${selected}" data-id="${q.id}">
-        <td>${q.id}</td>
-        <td>${q.isDone ? "✓" : ""}</td>
-        <td>${escapeHtml(q.category)}</td>
-        <td title="${escapeHtml(q.detail || "")}">${escapeHtml(q.title)}</td>
-        <td>${escapeHtml(formatDate(q.createdAt))}</td>
+        <td data-label="ID">${q.id}</td>
+        <td data-label="完了">${q.isDone ? "✓" : ""}</td>
+        <td data-label="カテゴリ">${escapeHtml(q.category)}</td>
+        <td data-label="クエスト" title="${escapeHtml(q.detail || "")}">${escapeHtml(q.title)}</td>
+        <td data-label="作成日">${escapeHtml(formatDate(q.createdAt))}</td>
       </tr>`;
     })
     .join("");
@@ -986,8 +1153,60 @@ function generateMotivation() {
   const concernText = concerns.length ? concerns.join("、") : "特になし";
   const strengths = state.profile.strengths || "（プロフィール未入力）";
   const experiences = state.profile.experiences || "（プロフィール未入力）";
+  const mode = els.motivationModeSelect.value || "outline";
+  const out = buildMotivationOutput(mode, company, plusText, concernText, strengths, experiences);
+  els.docsOutput.value = out;
+  state.appState.docsDraft = out;
+  saveState();
+}
 
-  const out = [
+function buildMotivationOutput(mode, company, plusText, concernText, strengths, experiences) {
+  if (mode === "200") {
+    return [
+      "志望動機 200字版（たたき台）",
+      "=".repeat(60),
+      `私が${company.name}を志望する理由は、${plusText}に強く惹かれたためです。`,
+      `これまでの経験で培った${strengths}を活かし、${company.role || "志望職種"}として顧客や事業の課題解決に貢献したいと考えています。`,
+      `入社後は現場理解を深め、早期に成果を出せる人材を目指します。`,
+      "",
+      `確認したい懸念: ${concernText}`,
+    ].join("\n");
+  }
+  if (mode === "400" || mode === "600") {
+    const extra = mode === "600"
+      ? [
+          "",
+          "さらに深める観点",
+          `- ${company.industry || "業界"}の中でなぜこの会社なのか`,
+          `- ${experiences} から再現できる行動`,
+          `- 入社後1年目に学びたいこと、3年目に担いたいこと`,
+        ]
+      : [];
+    return [
+      `志望動機 ${mode}字版（たたき台）`,
+      "=".repeat(60),
+      `私が${company.name}を志望する理由は、${plusText}に魅力を感じ、自分の価値観や強みと重なる部分が大きいと考えたためです。`,
+      `私はこれまで、${experiences}という経験を通じて、${strengths}を磨いてきました。`,
+      `この経験は、${company.role || "志望職種"}として相手の課題を捉え、周囲を巻き込みながら成果につなげる場面で活かせると考えています。`,
+      `一方で、${concernText}については選考を通じて理解を深めたいです。`,
+      "入社後は、まず現場で必要な知識と行動基準を吸収し、短期では任された業務で信頼を積み重ね、中長期では事業成長に直結する課題解決を担いたいです。",
+      ...extra,
+    ].join("\n");
+  }
+  if (mode === "interview") {
+    return [
+      "志望動機 面接30秒版",
+      "=".repeat(60),
+      `私が${company.name}を志望する理由は、${plusText}に惹かれたからです。`,
+      `自分の${strengths}という強みは、${company.role || "志望職種"}で成果を出すうえで活かせると考えています。`,
+      "入社後はまず現場で学び、早く信頼される行動を積み重ねたいです。",
+      "",
+      "深掘りされた時の補足",
+      `- 原体験: ${experiences}`,
+      `- 確認したい点: ${concernText}`,
+    ].join("\n");
+  }
+  return [
     "志望動機の骨子（たたき台）",
     "=".repeat(60),
     `対象企業: ${company.name} / ${company.industry} / 想定職種: ${company.role}`,
@@ -1008,6 +1227,51 @@ function generateMotivation() {
     "4. 入社後にやりたいこと",
     "入社後は現場理解を深めながら短期で成果を出し、中長期では事業成長に直結する課題解決を担いたいです。",
   ].join("\n");
+}
+
+function generateReverseQuestions() {
+  const companyId = toNumberOrNull(els.docsCompanySelect.value);
+  if (!companyId) {
+    alert("企業を選択してください。");
+    return;
+  }
+  const company = getCompanyById(companyId);
+  if (!company) return;
+  const concerns = state.cards
+    .filter((c) => c.companyId === companyId && c.cardType === "モヤモヤ")
+    .slice(-4)
+    .map((c) => c.title);
+  const pending = state.quests
+    .filter((q) => q.companyId === companyId && !q.isDone)
+    .slice(-4)
+    .map((q) => q.title);
+  const lines = [
+    "逆質問メーカー",
+    "=".repeat(60),
+    `企業: ${company.name} / 選考: ${company.applicationStatus}`,
+    "",
+    "そのまま聞ける質問",
+    "1. 入社後3カ月で期待される成果や行動を教えてください。",
+    `2. ${company.role || "この職種"}で活躍している若手に共通する姿勢や習慣はありますか？`,
+    "3. 配属後に最初につまずきやすいポイントと、乗り越え方を教えてください。",
+    "4. チーム内で大切にされているコミュニケーションの取り方を教えてください。",
+    "5. 評価される人と伸び悩む人の違いを、可能な範囲で教えてください。",
+    "",
+    "自分のメモから作った質問",
+  ];
+  if (concerns.length) {
+    concerns.forEach((item, index) => lines.push(`${index + 1}. ${item}について、実際の現場ではどのように捉えられていますか？`));
+  } else {
+    lines.push("- モヤモヤカードを追加すると、不安を自然な逆質問に変換できます。");
+  }
+  lines.push("");
+  lines.push("調べ残しから作った質問");
+  if (pending.length) {
+    pending.forEach((item, index) => lines.push(`${index + 1}. ${item}に関連して、選考前に理解しておくべき観点はありますか？`));
+  } else {
+    lines.push("- 未完了クエストがないため、基本質問を中心に準備できています。");
+  }
+  const out = lines.join("\n");
   els.docsOutput.value = out;
   state.appState.docsDraft = out;
   saveState();
@@ -1119,6 +1383,148 @@ async function callOllama(prompt, model) {
   const text = (data.response || "").trim();
   if (!text) throw new Error("空の応答が返されました。");
   return text;
+}
+
+function addSampleData() {
+  const ok = state.companies.length
+    ? confirm("サンプル企業・カード・クエストを追加します。現在のデータは残ります。")
+    : true;
+  if (!ok) return;
+  const today = new Date();
+  const samples = [
+    {
+      name: "ミライ食品",
+      industry: "食品・D2C",
+      role: "企画職",
+      status: "推し",
+      applicationStatus: "ES準備中",
+      deadlineOffset: 3,
+      eventOffset: 10,
+      eventName: "説明会",
+      plus: ["生活者の小さな困りごとから商品を作る姿勢", "若手でも企画提案できる文化"],
+      minus: ["繁忙期の働き方を確認したい"],
+    },
+    {
+      name: "ソラノデザイン",
+      industry: "IT・デザイン",
+      role: "UXリサーチ",
+      status: "本命",
+      applicationStatus: "一次面接",
+      deadlineOffset: 6,
+      eventOffset: 2,
+      eventName: "一次面接",
+      plus: ["ユーザー観察を重視したプロダクト改善", "チームで仮説検証する進め方"],
+      minus: ["配属後の教育体制を知りたい"],
+    },
+    {
+      name: "アオバテック",
+      industry: "SaaS",
+      role: "カスタマーサクセス",
+      status: "比較中",
+      applicationStatus: "説明会予定",
+      deadlineOffset: 12,
+      eventOffset: 5,
+      eventName: "オンライン説明会",
+      plus: ["顧客の業務改善に長く伴走できる点"],
+      minus: ["営業目標とのバランスが気になる"],
+    },
+  ];
+
+  samples.forEach((sample) => {
+    const id = state.meta.nextCompanyId++;
+    const now = nowIso();
+    state.companies.push({
+      id,
+      name: sample.name,
+      industry: sample.industry,
+      role: sample.role,
+      url: "",
+      status: sample.status,
+      applicationStatus: sample.applicationStatus,
+      deadlineDate: dateOffset(today, sample.deadlineOffset),
+      nextEventDate: dateOffset(today, sample.eventOffset),
+      nextEventName: sample.eventName,
+      understanding: 3,
+      empathy: 4,
+      fit: 4,
+      anxiety: 2,
+      interest: sample.status === "本命" ? 5 : 4,
+      notes: "サンプルデータです。使い方を試したら削除してOKです。",
+      createdAt: now,
+      updatedAt: now,
+    });
+    sample.plus.forEach((title) => {
+      state.cards.push({
+        id: state.meta.nextCardId++,
+        companyId: id,
+        cardType: "推しポイント",
+        title,
+        source: "サンプル",
+        detail: "",
+        createdAt: now,
+      });
+    });
+    sample.minus.forEach((title) => {
+      state.cards.push({
+        id: state.meta.nextCardId++,
+        companyId: id,
+        cardType: "モヤモヤ",
+        title,
+        source: "サンプル",
+        detail: "",
+        createdAt: now,
+      });
+    });
+    ensureQuestTemplates(id);
+  });
+
+  state.appState.onboardingSeen = true;
+  saveState();
+  restoreUiSelections();
+  renderAll();
+  setTab("home", true);
+  alert("サンプルデータを追加しました。");
+}
+
+async function deleteCloudData() {
+  if (!currentUser) {
+    alert("クラウドデータを削除するにはGoogleログインが必要です。");
+    return;
+  }
+  const ok = confirm("Firebase上のクラウドデータを削除します。\nこの端末のデータは残ります。続行しますか？");
+  if (!ok) return;
+  try {
+    window.clearTimeout(cloudSaveTimer);
+    await deleteDoc(cloudDocRef(currentUser.uid));
+    state.appState.cloudUserId = "";
+    state.appState.cloudLastSyncedAt = "";
+    saveLocalOnly();
+    await signOut(auth);
+    setSyncStatus("クラウド削除済み");
+    alert("クラウドデータを削除し、再保存を防ぐためログアウトしました。この端末のデータは残っています。");
+  } catch (err) {
+    console.error(err);
+    alert(`クラウドデータ削除に失敗しました。\n${err.message}`);
+  }
+}
+
+function clearLocalData() {
+  const ok = confirm("この端末の推しカンデータを削除します。\nクラウドデータは削除されません。必要なら先にJSONエクスポートしてください。");
+  if (!ok) return;
+  state = deepClone(defaultState);
+  ui.selectedCompanyId = null;
+  ui.selectedCardId = null;
+  ui.selectedQuestId = null;
+  saveLocalOnly();
+  renderAll();
+  setTab("home", false);
+  maybeShowOnboarding();
+}
+
+function openFeedback() {
+  const title = encodeURIComponent("推しカンへのフィードバック");
+  const body = encodeURIComponent("困ったこと・ほしい機能:\n\n使っている環境:\n");
+  window.open(`https://github.com/anemos-dev/oshikan/issues/new?title=${title}&body=${body}`, "_blank", "noopener");
 }
 
 function renderProfileForm() {
@@ -1236,6 +1642,10 @@ function normalizeImportedState(data) {
     role: String(c.role || ""),
     url: String(c.url || ""),
     status: STATUS_OPTIONS.includes(c.status) ? c.status : STATUS_OPTIONS[0],
+    applicationStatus: APPLICATION_STATUS_OPTIONS.includes(c.applicationStatus) ? c.applicationStatus : APPLICATION_STATUS_OPTIONS[0],
+    deadlineDate: normalizeDateInput(c.deadlineDate),
+    nextEventDate: normalizeDateInput(c.nextEventDate),
+    nextEventName: String(c.nextEventName || ""),
     understanding: clampInt(c.understanding, 0, 5),
     empathy: clampInt(c.empathy, 0, 5),
     fit: clampInt(c.fit, 0, 5),
@@ -1315,6 +1725,7 @@ function normalizeImportedState(data) {
     termsAcceptedAt: String(data.appState?.termsAcceptedAt || ""),
     cloudUserId: String(data.appState?.cloudUserId || ""),
     cloudLastSyncedAt: String(data.appState?.cloudLastSyncedAt || ""),
+    onboardingSeen: Boolean(data.appState?.onboardingSeen),
   };
   return next;
 }
@@ -1357,6 +1768,27 @@ function formatDate(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   return date.toLocaleString("ja-JP");
+}
+
+function normalizeDateInput(value) {
+  const text = String(value || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+}
+
+function dateOffset(baseDate, offsetDays) {
+  const date = new Date(baseDate);
+  date.setDate(date.getDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+}
+
+function daysUntil(dateText) {
+  const normalized = normalizeDateInput(dateText);
+  if (!normalized) return null;
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const [year, month, day] = normalized.split("-").map(Number);
+  const targetUtc = Date.UTC(year, month - 1, day);
+  return Math.round((targetUtc - todayUtc) / 86400000);
 }
 
 function toNumberOrNull(v) {

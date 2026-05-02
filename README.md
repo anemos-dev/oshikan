@@ -25,7 +25,13 @@
 
 ## すぐ使う
 
-GitHub Pagesで公開している場合は、リポジトリのPages URLを開くだけで使えます。
+GitHub Pagesで公開している場合は、公開URLを開くだけで使えます。
+
+```text
+https://<YOUR_GITHUB_USERNAME>.github.io/<YOUR_REPOSITORY_NAME>/
+```
+
+インストールやGit操作は不要です。データは開いた人それぞれのブラウザに保存されます。
 
 ローカルで使う場合:
 
@@ -56,6 +62,13 @@ python3 -m http.server 8765
 
 数分後に表示されるURLを友達に共有すれば使えます。
 
+push例:
+
+```bash
+git remote add origin https://github.com/<YOUR_GITHUB_USERNAME>/<YOUR_REPOSITORY_NAME>.git
+git push -u origin main
+```
+
 ## データ保存について
 
 推しカンのデータは、各ユーザーのブラウザの `localStorage` に保存されます。  
@@ -82,6 +95,8 @@ ollama pull qwen2.5:7b-instruct
 ├── app.js
 ├── run.command
 ├── README.md
+├── LICENSE
+├── .nojekyll
 └── .gitignore
 ```
 

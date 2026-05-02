@@ -18,6 +18,9 @@
       <p>完全無料・ローカル保存・再起動復元対応</p>
     </div>
     <div class="header-actions">
+      <span id="syncStatus" class="sync-status">未ログイン</span>
+      <button id="loginBtn" class="ghost">Googleログイン</button>
+      <button id="logoutBtn" class="ghost hidden">ログアウト</button>
       <button id="exportBtn" class="ghost">JSONエクスポート</button>
       <button id="importBtn" class="ghost">JSONインポート</button>
       <input id="importFileInput" type="file" accept="application/json" hidden>
@@ -292,8 +295,9 @@
         <section class="panel">
           <h2>保存とバックアップ</h2>
           <ul class="guide-list">
-            <li>データは自分のブラウザに自動保存されます。</li>
-            <li>友達と同じURLを使っても、データは共有されません。</li>
+            <li>未ログイン時のデータは自分のブラウザに自動保存されます。</li>
+            <li>Googleログイン中は、自分のFirebaseアカウント領域にも同期されます。</li>
+            <li>友達と同じURLを使っても、データは他の人には共有されません。</li>
             <li>大事なデータはホーム右上のJSONエクスポートで保存できます。</li>
             <li>別PCや別ブラウザで使うときは、JSONインポートで復元できます。</li>
           </ul>
@@ -328,13 +332,14 @@
       <div class="terms-body">
         <p>推しカンは就活の企業研究を助けるための個人向けツールです。安心して使うために、次の内容を確認してください。</p>
         <ul>
-          <li>入力した企業メモ・プロフィール・カードは、このブラウザのlocalStorageに保存されます。推しカン自体は入力内容を外部サーバーへ送信しません。</li>
-          <li>GitHub Pagesで公開して使う場合、ページ配信はGitHubのサービス上で行われます。推しカンの入力データは各自のブラウザに保存され、友達同士で共有されません。</li>
+          <li>未ログイン時に入力した企業メモ・プロフィール・カードは、このブラウザのlocalStorageに保存されます。</li>
+          <li>Googleログイン中は、入力データがFirebase AuthenticationとCloud Firestoreを通じて、ログインした本人のクラウド領域に保存・同期されます。</li>
+          <li>GitHub Pagesで公開して使う場合、ページ配信はGitHubのサービス上で行われます。推しカンの入力データは本人のブラウザまたは本人のFirebaseユーザー領域に保存され、友達同士で共有されません。</li>
           <li>説明会資料、採用ページ、社員インタビューなどの文章を貼る場合は、必要な範囲にとどめ、出典をメモしてください。無断転載や再配布を目的に使わないでください。</li>
           <li>他人の個人情報、非公開情報、企業の機密情報、過度にセンシティブな情報は入力しないでください。</li>
           <li>志望動機や面接回答の出力は下書きです。内容の正確性や選考結果は保証されないため、最終確認は自分で行ってください。</li>
           <li>ローカルAI改善は任意機能です。Ollamaなどを使う場合は、自分のPC環境と利用するモデルの条件を確認してください。</li>
-          <li>大事なデータはJSONエクスポートでバックアップしてください。ブラウザのデータ削除や端末変更でlocalStorageの内容が消える場合があります。</li>
+          <li>大事なデータはJSONエクスポートでもバックアップしてください。未ログイン時は、ブラウザのデータ削除や端末変更でlocalStorageの内容が消える場合があります。</li>
         </ul>
         <label class="terms-check">
           <input id="termsAgreeCheck" type="checkbox">
@@ -348,6 +353,6 @@
     </section>
   </div>
 
-  <script src="./app.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>

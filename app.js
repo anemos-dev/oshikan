@@ -1,5 +1,36 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import {
+  GoogleAuthProvider,
+  getAuth,
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut,
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import {
+  doc,
+  getDoc,
+  getFirestore,
+  serverTimestamp,
+  setDoc,
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
 const STORAGE_KEY = "oshikan.v2";
 const TERMS_VERSION = 1;
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA1iKn4uYlcG4t7zUjt_Q1361I5Cno67XM",
+  authDomain: "oshikan-f13ca.firebaseapp.com",
+  projectId: "oshikan-f13ca",
+  storageBucket: "oshikan-f13ca.firebasestorage.app",
+  messagingSenderId: "285596191651",
+  appId: "1:285596191651:web:a9ee9f1ced86c27783e816",
+  measurementId: "G-YR2QK0SQH7",
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+const googleProvider = new GoogleAuthProvider();
 
 const STATUS_OPTIONS = ["気になる", "推し", "本命", "比較中", "保留", "卒業"];
 const CARD_TYPES = ["推しポイント", "モヤモヤ"];
@@ -46,6 +77,8 @@ const defaultState = {
     ollamaModel: "qwen2.5:7b-instruct",
     termsVersion: 0,
     termsAcceptedAt: "",
+    cloudUserId: "",
+    cloudLastSyncedAt: "",
   },
 };
 
@@ -56,6 +89,9 @@ const ui = {
 };
 
 let state = loadState();
+let currentUser = null;
+let cloudSaveTimer = null;
+let isLoadingCloud = false;
 
 const els = {
   tabButtons: [...document.querySelectorAll(".tab-btn")],
@@ -63,6 +99,9 @@ const els = {
   exportBtn: document.getElementById("exportBtn"),
   importBtn: document.getElementById("importBtn"),
   importFileInput: document.getElementById("importFileInput"),
+  loginBtn: document.getElementById("loginBtn"),
+  logoutBtn: document.getElementById("logoutBtn"),
+  syncStatus: document.getElementById("syncStatus"),
   statCompanies: document.getElementById("statCompanies"),
   statCards: document.getElementById("statCards"),
   statQuests: document.getElementById("statQuests"),
@@ -137,6 +176,7 @@ function init() {
   renderAll();
   setTab(state.appState.activeTab || "home", false);
   maybeShowTermsModal();
+  watchAuthState();
 }
 
 function renderStaticSelects() {
@@ -238,6 +278,8 @@ function bindEvents() {
   els.exportBtn.addEventListener("click", exportJson);
   els.importBtn.addEventListener("click", () => els.importFileInput.click());
   els.importFileInput.addEventListener("change", importJson);
+  els.loginBtn.addEventListener("click", loginWithGoogle);
+  els.logoutBtn.addEventListener("click", logoutFromGoogle);
 }
 
 function maybeShowTermsModal() {
@@ -263,6 +305,145 @@ function acceptTerms() {
   state.appState.termsAcceptedAt = nowIso();
   saveState();
   hideTermsModal();
+}
+
+function watchAuthState() {
+  onAuthStateChanged(auth, async (user) => {
+    currentUser = user;
+    renderAuthUi();
+    if (user) {
+      await loadCloudState(user);
+    } else {
+      setSyncStatus("未ログイン");
+    }
+  });
+}
+
+async function loginWithGoogle() {
+  setSyncStatus("ログイン中...");
+  try {
+    await signInWithPopup(auth, googleProvider);
+  } catch (err) {
+    console.error(err);
+    setSyncStatus("ログイン失敗");
+    alert(`Googleログインに失敗しました。\n${err.message}`);
+  }
+}
+
+async function logoutFromGoogle() {
+  try {
+    await flushCloudSave();
+    await signOut(auth);
+  } catch (err) {
+    console.error(err);
+    alert(`ログアウトに失敗しました。\n${err.message}`);
+  }
+}
+
+function renderAuthUi() {
+  if (currentUser) {
+    els.loginBtn.classList.add("hidden");
+    els.logoutBtn.classList.remove("hidden");
+    setSyncStatus(`${currentUser.displayName || "ログイン中"} と同期`);
+  } else {
+    els.loginBtn.classList.remove("hidden");
+    els.logoutBtn.classList.add("hidden");
+  }
+}
+
+function setSyncStatus(text) {
+  els.syncStatus.textContent = text;
+}
+
+async function loadCloudState(user) {
+  isLoadingCloud = true;
+  setSyncStatus("クラウド確認中...");
+  try {
+    const ref = cloudDocRef(user.uid);
+    const snapshot = await getDoc(ref);
+    const localHasData = hasUserData(state);
+    const isSameCloudUser = state.appState.cloudUserId === user.uid;
+
+    if (!snapshot.exists()) {
+      await saveStateToCloudNow();
+      setSyncStatus("クラウドに保存しました");
+      return;
+    }
+
+    const cloudPayload = snapshot.data();
+    const cloudState = normalizeImportedState(cloudPayload.state || {});
+
+    if (localHasData && !isSameCloudUser) {
+      const useCloud = confirm(
+        "クラウドに保存済みの推しカンデータがあります。\n\nOK: クラウドデータをこの端末に読み込む\nキャンセル: この端末のデータでクラウドを上書きする"
+      );
+      if (!useCloud) {
+        await saveStateToCloudNow();
+        setSyncStatus("この端末のデータを同期しました");
+        return;
+      }
+    }
+
+    state = cloudState;
+    state.appState.cloudUserId = user.uid;
+    state.appState.cloudLastSyncedAt = nowIso();
+    saveLocalOnly();
+    restoreUiSelections();
+    renderAll();
+    setTab(state.appState.activeTab || "home", false);
+    setSyncStatus("クラウドから読み込みました");
+  } catch (err) {
+    console.error(err);
+    setSyncStatus("同期エラー");
+    alert(`クラウド同期に失敗しました。\n${err.message}`);
+  } finally {
+    isLoadingCloud = false;
+  }
+}
+
+function cloudDocRef(uid) {
+  return doc(db, "users", uid, "appState", "main");
+}
+
+function hasUserData(targetState) {
+  return (
+    targetState.companies.length > 0 ||
+    targetState.cards.length > 0 ||
+    targetState.quests.length > 0 ||
+    Boolean(targetState.profile.strengths || targetState.profile.experiences || targetState.profile.valuesText)
+  );
+}
+
+function scheduleCloudSave() {
+  if (!currentUser || isLoadingCloud) return;
+  window.clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = window.setTimeout(() => {
+    saveStateToCloudNow();
+  }, 900);
+}
+
+async function flushCloudSave() {
+  if (!currentUser) return;
+  window.clearTimeout(cloudSaveTimer);
+  await saveStateToCloudNow();
+}
+
+async function saveStateToCloudNow() {
+  if (!currentUser) return;
+  state.appState.cloudUserId = currentUser.uid;
+  state.appState.cloudLastSyncedAt = nowIso();
+  saveLocalOnly();
+  setSyncStatus("保存中...");
+  await setDoc(
+    cloudDocRef(currentUser.uid),
+    {
+      state,
+      updatedAt: serverTimestamp(),
+      version: 2,
+    },
+    { merge: true }
+  );
+  setSyncStatus("保存済み");
 }
 
 function bindCompanyRange(inputEl, valueEl) {
@@ -1120,6 +1301,8 @@ function normalizeImportedState(data) {
     ollamaModel: String(data.appState?.ollamaModel || "qwen2.5:7b-instruct"),
     termsVersion: Number(data.appState?.termsVersion || 0),
     termsAcceptedAt: String(data.appState?.termsAcceptedAt || ""),
+    cloudUserId: String(data.appState?.cloudUserId || ""),
+    cloudLastSyncedAt: String(data.appState?.cloudLastSyncedAt || ""),
   };
   return next;
 }
@@ -1136,6 +1319,11 @@ function loadState() {
 }
 
 function saveState() {
+  saveLocalOnly();
+  scheduleCloudSave();
+}
+
+function saveLocalOnly() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 

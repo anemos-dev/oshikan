@@ -2,8 +2,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/fireba
 import {
   GoogleAuthProvider,
   getAuth,
+  getRedirectResult,
   onAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import {
@@ -176,6 +177,7 @@ function init() {
   renderAll();
   setTab(state.appState.activeTab || "home", false);
   maybeShowTermsModal();
+  handleRedirectSignIn();
   watchAuthState();
 }
 
@@ -319,10 +321,20 @@ function watchAuthState() {
   });
 }
 
+async function handleRedirectSignIn() {
+  try {
+    await getRedirectResult(auth);
+  } catch (err) {
+    console.error(err);
+    setSyncStatus("ログイン失敗");
+    alert(`Googleログインに失敗しました。\n${err.message}`);
+  }
+}
+
 async function loginWithGoogle() {
   setSyncStatus("ログイン中...");
   try {
-    await signInWithPopup(auth, googleProvider);
+    await signInWithRedirect(auth, googleProvider);
   } catch (err) {
     console.error(err);
     setSyncStatus("ログイン失敗");

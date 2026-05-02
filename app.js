@@ -1,4 +1,5 @@
 const STORAGE_KEY = "oshikan.v2";
+const TERMS_VERSION = 1;
 
 const STATUS_OPTIONS = ["気になる", "推し", "本命", "比較中", "保留", "卒業"];
 const CARD_TYPES = ["推しポイント", "モヤモヤ"];
@@ -43,6 +44,8 @@ const defaultState = {
     docsDraft: "",
     compareDraft: "",
     ollamaModel: "qwen2.5:7b-instruct",
+    termsVersion: 0,
+    termsAcceptedAt: "",
   },
 };
 
@@ -118,6 +121,11 @@ const els = {
   weightInputs: [...document.querySelectorAll("[data-weight]")],
   weightValues: [...document.querySelectorAll("[data-weight-value]")],
   saveProfileBtn: document.getElementById("saveProfileBtn"),
+  openTermsBtn: document.getElementById("openTermsBtn"),
+  termsModal: document.getElementById("termsModal"),
+  termsAgreeCheck: document.getElementById("termsAgreeCheck"),
+  termsAcceptBtn: document.getElementById("termsAcceptBtn"),
+  termsCloseBtn: document.getElementById("termsCloseBtn"),
 };
 
 init();
@@ -128,6 +136,7 @@ function init() {
   restoreUiSelections();
   renderAll();
   setTab(state.appState.activeTab || "home", false);
+  maybeShowTermsModal();
 }
 
 function renderStaticSelects() {
@@ -210,6 +219,12 @@ function bindEvents() {
   });
 
   els.saveProfileBtn.addEventListener("click", saveProfile);
+  els.openTermsBtn.addEventListener("click", () => showTermsModal(false));
+  els.termsAgreeCheck.addEventListener("change", () => {
+    els.termsAcceptBtn.disabled = !els.termsAgreeCheck.checked;
+  });
+  els.termsAcceptBtn.addEventListener("click", acceptTerms);
+  els.termsCloseBtn.addEventListener("click", () => hideTermsModal());
   els.weightInputs.forEach((input) => {
     input.addEventListener("input", () => {
       const key = input.dataset.weight;
@@ -223,6 +238,31 @@ function bindEvents() {
   els.exportBtn.addEventListener("click", exportJson);
   els.importBtn.addEventListener("click", () => els.importFileInput.click());
   els.importFileInput.addEventListener("change", importJson);
+}
+
+function maybeShowTermsModal() {
+  if (Number(state.appState.termsVersion || 0) < TERMS_VERSION) {
+    showTermsModal(true);
+  }
+}
+
+function showTermsModal(requireAcceptance) {
+  els.termsModal.classList.remove("hidden");
+  els.termsModal.dataset.required = requireAcceptance ? "true" : "false";
+  els.termsAgreeCheck.checked = false;
+  els.termsAcceptBtn.disabled = true;
+  els.termsCloseBtn.style.display = requireAcceptance ? "none" : "inline-flex";
+}
+
+function hideTermsModal() {
+  els.termsModal.classList.add("hidden");
+}
+
+function acceptTerms() {
+  state.appState.termsVersion = TERMS_VERSION;
+  state.appState.termsAcceptedAt = nowIso();
+  saveState();
+  hideTermsModal();
 }
 
 function bindCompanyRange(inputEl, valueEl) {
@@ -1078,6 +1118,8 @@ function normalizeImportedState(data) {
     docsDraft: String(data.appState?.docsDraft || ""),
     compareDraft: String(data.appState?.compareDraft || ""),
     ollamaModel: String(data.appState?.ollamaModel || "qwen2.5:7b-instruct"),
+    termsVersion: Number(data.appState?.termsVersion || 0),
+    termsAcceptedAt: String(data.appState?.termsAcceptedAt || ""),
   };
   return next;
 }

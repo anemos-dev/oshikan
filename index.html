@@ -312,9 +312,41 @@
       <section class="panel guide-ai">
         <h2>ローカルAIについて</h2>
         <p>「ローカルAIで改善」は、Ollamaを入れている人だけが使う任意機能です。入れていなくても、企業管理・カード・クエスト・比較・志望動機生成はそのまま使えます。</p>
+        <div class="button-row">
+          <button id="openTermsBtn" class="ghost">利用前の確認を表示</button>
+        </div>
       </section>
     </section>
   </main>
+
+  <div id="termsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="termsTitle">
+    <section class="terms-modal">
+      <div class="terms-header">
+        <p>利用前の確認</p>
+        <h2 id="termsTitle">推しカンを使う前に</h2>
+      </div>
+      <div class="terms-body">
+        <p>推しカンは就活の企業研究を助けるための個人向けツールです。安心して使うために、次の内容を確認してください。</p>
+        <ul>
+          <li>入力した企業メモ・プロフィール・カードは、このブラウザのlocalStorageに保存されます。推しカン自体は入力内容を外部サーバーへ送信しません。</li>
+          <li>GitHub Pagesで公開して使う場合、ページ配信はGitHubのサービス上で行われます。推しカンの入力データは各自のブラウザに保存され、友達同士で共有されません。</li>
+          <li>説明会資料、採用ページ、社員インタビューなどの文章を貼る場合は、必要な範囲にとどめ、出典をメモしてください。無断転載や再配布を目的に使わないでください。</li>
+          <li>他人の個人情報、非公開情報、企業の機密情報、過度にセンシティブな情報は入力しないでください。</li>
+          <li>志望動機や面接回答の出力は下書きです。内容の正確性や選考結果は保証されないため、最終確認は自分で行ってください。</li>
+          <li>ローカルAI改善は任意機能です。Ollamaなどを使う場合は、自分のPC環境と利用するモデルの条件を確認してください。</li>
+          <li>大事なデータはJSONエクスポートでバックアップしてください。ブラウザのデータ削除や端末変更でlocalStorageの内容が消える場合があります。</li>
+        </ul>
+        <label class="terms-check">
+          <input id="termsAgreeCheck" type="checkbox">
+          内容を確認しました
+        </label>
+      </div>
+      <div class="terms-actions">
+        <button id="termsAcceptBtn" disabled>確認して使い始める</button>
+        <button id="termsCloseBtn" class="ghost">閉じる</button>
+      </div>
+    </section>
+  </div>
 
   <script src="./app.js"></script>
 </body>

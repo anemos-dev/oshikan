@@ -28,7 +28,7 @@
 GitHub Pagesで公開している場合は、公開URLを開くだけで使えます。
 
 ```text
-https://<YOUR_GITHUB_USERNAME>.github.io/<YOUR_REPOSITORY_NAME>/
+https://anemos-dev.github.io/oshikan/
 ```
 
 インストールやGit操作は不要です。データは開いた人それぞれのブラウザに保存されます。
@@ -36,8 +36,8 @@ https://<YOUR_GITHUB_USERNAME>.github.io/<YOUR_REPOSITORY_NAME>/
 ローカルで使う場合:
 
 ```bash
-git clone <YOUR_REPOSITORY_URL>
-cd oshi-company-tool
+git clone https://github.com/anemos-dev/oshikan.git
+cd oshikan
 ./run.command
 ```
 
@@ -65,7 +65,7 @@ python3 -m http.server 8765
 push例:
 
 ```bash
-git remote add origin https://github.com/<YOUR_GITHUB_USERNAME>/<YOUR_REPOSITORY_NAME>.git
+git remote add origin https://github.com/anemos-dev/oshikan.git
 git push -u origin main
 ```
 

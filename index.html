@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>推しカン</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="bg-orb orb-a" aria-hidden="true"></div>
+  <div class="bg-orb orb-b" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <header class="app-header">
+    <div class="brand-block">
+      <p class="brand-kicker">推しカンパニー</p>
+      <h1>推しカン</h1>
+      <p>完全無料・ローカル保存・再起動復元対応</p>
+    </div>
+    <div class="header-actions">
+      <button id="exportBtn" class="ghost">JSONエクスポート</button>
+      <button id="importBtn" class="ghost">JSONインポート</button>
+      <input id="importFileInput" type="file" accept="application/json" hidden>
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Main Tabs">
+    <button class="tab-btn active" data-tab="home">ホーム</button>
+    <button class="tab-btn" data-tab="companies">推し棚</button>
+    <button class="tab-btn" data-tab="cards">カード</button>
+    <button class="tab-btn" data-tab="quests">クエスト</button>
+    <button class="tab-btn" data-tab="compare">比較</button>
+    <button class="tab-btn" data-tab="docs">ES/面接</button>
+    <button class="tab-btn" data-tab="profile">プロフィール</button>
+  </nav>
+
+  <main class="app-main">
+    <section id="tab-home" class="tab-panel active">
+      <section class="launch-banner">
+        <p>探索モード起動中</p>
+        <h2>今日の一歩で、推し企業の解像度を上げる</h2>
+      </section>
+      <div class="stats-grid">
+        <article class="stat-card">
+          <h3>登録企業</h3>
+          <p id="statCompanies">0</p>
+        </article>
+        <article class="stat-card">
+          <h3>カード総数</h3>
+          <p id="statCards">0</p>
+        </article>
+        <article class="stat-card">
+          <h3>クエスト完了率</h3>
+          <p id="statQuests">0 / 0</p>
+        </article>
+      </div>
+      <div class="two-col">
+        <section class="panel">
+          <h2>未完了クエスト</h2>
+          <ul id="homeQuestList" class="list"></ul>
+        </section>
+        <section class="panel">
+          <h2>最近のカード</h2>
+          <ul id="homeCardList" class="list"></ul>
+        </section>
+      </div>
+    </section>
+
+    <section id="tab-companies" class="tab-panel">
+      <div class="two-col">
+        <section class="panel">
+          <h2>企業一覧</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>企業名</th>
+                  <th>分類</th>
+                  <th>業界</th>
+                  <th>職種</th>
+                  <th>志望度</th>
+                </tr>
+              </thead>
+              <tbody id="companyTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>企業詳細</h2>
+          <div class="form-grid">
+            <label>企業名<input id="companyName" type="text" maxlength="120"></label>
+            <label>業界<input id="companyIndustry" type="text" maxlength="120"></label>
+            <label>想定職種<input id="companyRole" type="text" maxlength="120"></label>
+            <label>URL<input id="companyUrl" type="url" maxlength="240"></label>
+            <label>分類
+              <select id="companyStatus"></select>
+            </label>
+          </div>
+          <div class="range-grid">
+            <label>理解度 <input id="companyUnderstanding" type="range" min="0" max="5" step="1"><span id="companyUnderstandingValue">0</span></label>
+            <label>共感度 <input id="companyEmpathy" type="range" min="0" max="5" step="1"><span id="companyEmpathyValue">0</span></label>
+            <label>相性度 <input id="companyFit" type="range" min="0" max="5" step="1"><span id="companyFitValue">0</span></label>
+            <label>不安度 <input id="companyAnxiety" type="range" min="0" max="5" step="1"><span id="companyAnxietyValue">0</span></label>
+            <label>志望度 <input id="companyInterest" type="range" min="0" max="5" step="1"><span id="companyInterestValue">0</span></label>
+          </div>
+          <label>メモ<textarea id="companyNotes" rows="6"></textarea></label>
+          <div class="button-row">
+            <button id="companyAddBtn">新規追加</button>
+            <button id="companyUpdateBtn" class="ghost">保存</button>
+            <button id="companyDeleteBtn" class="danger">削除</button>
+            <button id="companyClearBtn" class="ghost">フォームクリア</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="tab-cards" class="tab-panel">
+      <div class="panel">
+        <div class="inline-header">
+          <h2>カード管理</h2>
+          <label>企業
+            <select id="cardsCompanySelect"></select>
+          </label>
+        </div>
+        <div class="two-col">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>種類</th>
+                  <th>タイトル</th>
+                  <th>情報源</th>
+                  <th>作成日</th>
+                </tr>
+              </thead>
+              <tbody id="cardTableBody"></tbody>
+            </table>
+          </div>
+          <div>
+            <div class="form-grid">
+              <label>種類
+                <select id="cardType"></select>
+              </label>
+              <label>タイトル<input id="cardTitle" type="text" maxlength="140"></label>
+              <label>情報源<input id="cardSource" type="text" maxlength="140"></label>
+            </div>
+            <label>詳細<textarea id="cardDetail" rows="10"></textarea></label>
+            <div class="button-row">
+              <button id="cardAddBtn">追加</button>
+              <button id="cardUpdateBtn" class="ghost">更新</button>
+              <button id="cardDeleteBtn" class="danger">削除</button>
+              <button id="cardClearBtn" class="ghost">フォームクリア</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-quests" class="tab-panel">
+      <div class="panel">
+        <div class="inline-header">
+          <h2>クエスト管理</h2>
+          <label>企業
+            <select id="questsCompanySelect"></select>
+          </label>
+          <button id="generateQuestBtn" class="ghost">クエスト自動追加</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>完了</th>
+                <th>カテゴリ</th>
+                <th>クエスト</th>
+                <th>作成日</th>
+              </tr>
+            </thead>
+            <tbody id="questTableBody"></tbody>
+          </table>
+        </div>
+        <div class="button-row">
+          <button id="questDoneBtn">完了にする</button>
+          <button id="questUndoneBtn" class="ghost">未完了に戻す</button>
+          <button id="questDeleteBtn" class="danger">削除</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-compare" class="tab-panel">
+      <div class="two-col">
+        <section class="panel">
+          <h2>比較企業選択</h2>
+          <div id="compareChecklist" class="checklist"></div>
+          <button id="runCompareBtn">比較実行</button>
+        </section>
+        <section class="panel">
+          <h2>比較結果</h2>
+          <textarea id="compareOutput" rows="20" readonly></textarea>
+        </section>
+      </div>
+    </section>
+
+    <section id="tab-docs" class="tab-panel">
+      <div class="panel">
+        <div class="inline-header">
+          <h2>ES / 面接サポート</h2>
+          <label>企業
+            <select id="docsCompanySelect"></select>
+          </label>
+          <button id="genMotivationBtn">志望動機骨子を生成</button>
+          <button id="genInterviewBtn" class="ghost">面接前30秒復習</button>
+        </div>
+        <div class="inline-header">
+          <label>ローカルAIモデル
+            <input id="ollamaModelInput" type="text" value="qwen2.5:7b-instruct">
+          </label>
+          <button id="improveLocalAiBtn" class="ghost">ローカルAIで改善</button>
+        </div>
+        <textarea id="docsOutput" rows="22"></textarea>
+      </div>
+    </section>
+
+    <section id="tab-profile" class="tab-panel">
+      <div class="panel">
+        <h2>プロフィール</h2>
+        <div class="form-grid">
+          <label>名前<input id="profileName" type="text" maxlength="80"></label>
+        </div>
+        <label>強み<textarea id="profileStrengths" rows="5"></textarea></label>
+        <label>経験（ガクチカ・実績）<textarea id="profileExperiences" rows="6"></textarea></label>
+        <label>価値観メモ<textarea id="profileValues" rows="5"></textarea></label>
+
+        <h3>比較用重み（1〜5）</h3>
+        <div class="range-grid" id="weightsGrid">
+          <label>成長 <input data-weight="growth" type="range" min="1" max="5" step="1"><span data-weight-value="growth">3</span></label>
+          <label>安定 <input data-weight="stability" type="range" min="1" max="5" step="1"><span data-weight-value="stability">3</span></label>
+          <label>裁量 <input data-weight="autonomy" type="range" min="1" max="5" step="1"><span data-weight-value="autonomy">3</span></label>
+          <label>社会貢献 <input data-weight="social" type="range" min="1" max="5" step="1"><span data-weight-value="social">3</span></label>
+          <label>カルチャー <input data-weight="culture" type="range" min="1" max="5" step="1"><span data-weight-value="culture">3</span></label>
+          <label>働き方 <input data-weight="worklife" type="range" min="1" max="5" step="1"><span data-weight-value="worklife">3</span></label>
+        </div>
+        <div class="button-row">
+          <button id="saveProfileBtn">プロフィール保存</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>

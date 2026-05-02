@@ -18,7 +18,7 @@ const STORAGE_KEY = "oshikan.v2";
 const TERMS_VERSION = 1;
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA1iKn4uYlcG4t7zUjt_Q1361I5Cno67XM",
+  apiKey: "AIzaSyA1iKn4uY1cG4t7zUjt_Q1361I5Cno67XM",
   authDomain: "oshikan-f13ca.firebaseapp.com",
   projectId: "oshikan-f13ca",
   storageBucket: "oshikan-f13ca.firebasestorage.app",

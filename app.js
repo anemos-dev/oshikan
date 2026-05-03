@@ -93,6 +93,7 @@ const defaultState = {
     cloudUserId: "",
     cloudLastSyncedAt: "",
     onboardingSeen: false,
+    sampleDataAdded: false,
   },
 };
 
@@ -598,6 +599,7 @@ function renderHome() {
   els.statCompanies.textContent = String(totalCompanies);
   els.statCards.textContent = String(totalCards);
   els.statQuests.textContent = `${doneQuests} / ${totalQuests}`;
+  renderSampleDataButton();
 
   const todos = buildTodayTodos();
   els.todayTodoList.innerHTML = todos
@@ -633,6 +635,14 @@ function renderHome() {
   if (!recentCards.length) {
     els.homeCardList.innerHTML = "<li>カードがまだありません。</li>";
   }
+}
+
+function renderSampleDataButton() {
+  const added = Boolean(state.appState.sampleDataAdded);
+  els.addSampleDataBtn.disabled = added;
+  els.addSampleDataBtn.textContent = added ? "サンプル投入済み" : "サンプルデータを入れる";
+  els.onboardingSampleBtn.disabled = added;
+  els.onboardingSampleBtn.textContent = added ? "サンプル投入済み" : "サンプルで試す";
 }
 
 function buildTodayTodos() {
@@ -1420,8 +1430,15 @@ async function callOllama(prompt, model) {
 }
 
 function addSampleData() {
+  if (state.appState.sampleDataAdded || hasSampleCompanies()) {
+    state.appState.sampleDataAdded = true;
+    saveState();
+    renderSampleDataButton();
+    alert("サンプルデータはすでに追加済みです。重複を防ぐため、もう一度は追加しません。");
+    return;
+  }
   const ok = state.companies.length
-    ? confirm("サンプル企業・カード・クエストを追加します。現在のデータは残ります。")
+    ? confirm("サンプル企業・カード・クエストを追加します。現在のデータは残ります。サンプル投入は1回だけです。")
     : true;
   if (!ok) return;
   const today = new Date();
@@ -1513,11 +1530,17 @@ function addSampleData() {
   });
 
   state.appState.onboardingSeen = true;
+  state.appState.sampleDataAdded = true;
   saveState();
   restoreUiSelections();
   renderAll();
   setTab("home", true);
   alert("サンプルデータを追加しました。");
+}
+
+function hasSampleCompanies() {
+  const sampleNames = new Set(["ミライ食品", "ソラノデザイン", "アオバテック"]);
+  return state.companies.some((company) => sampleNames.has(company.name));
 }
 
 async function deleteCloudData() {
@@ -1760,6 +1783,7 @@ function normalizeImportedState(data) {
     cloudUserId: String(data.appState?.cloudUserId || ""),
     cloudLastSyncedAt: String(data.appState?.cloudLastSyncedAt || ""),
     onboardingSeen: Boolean(data.appState?.onboardingSeen),
+    sampleDataAdded: Boolean(data.appState?.sampleDataAdded) || next.companies.some((company) => ["ミライ食品", "ソラノデザイン", "アオバテック"].includes(company.name)),
   };
   return next;
 }

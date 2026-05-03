@@ -1,9 +1,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
+  browserLocalPersistence,
   GoogleAuthProvider,
   getAuth,
   getRedirectResult,
   onAuthStateChanged,
+  setPersistence,
   signInWithRedirect,
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
@@ -200,15 +202,24 @@ const els = {
 
 init();
 
-function init() {
+async function init() {
   renderStaticSelects();
   bindEvents();
   restoreUiSelections();
   renderAll();
   setTab(state.appState.activeTab || "home", false);
   maybeShowTermsModal();
-  handleRedirectSignIn();
+  await prepareAuth();
+  await handleRedirectSignIn();
   watchAuthState();
+}
+
+async function prepareAuth() {
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+  } catch (err) {
+    console.warn("Auth persistence setup failed", err);
+  }
 }
 
 function renderStaticSelects() {
@@ -396,7 +407,11 @@ function watchAuthState() {
 
 async function handleRedirectSignIn() {
   try {
-    await getRedirectResult(auth);
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+      currentUser = result.user;
+      renderAuthUi();
+    }
   } catch (err) {
     console.error(err);
     setSyncStatus("ログイン失敗");

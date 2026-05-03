@@ -6,6 +6,7 @@ import {
   getRedirectResult,
   onAuthStateChanged,
   setPersistence,
+  signInWithPopup,
   signInWithRedirect,
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
@@ -422,12 +423,30 @@ async function handleRedirectSignIn() {
 async function loginWithGoogle() {
   setSyncStatus("ログイン中...");
   try {
-    await signInWithRedirect(auth, googleProvider);
+    const result = await signInWithPopup(auth, googleProvider);
+    currentUser = result.user;
+    renderAuthUi();
+    await loadCloudState(result.user);
   } catch (err) {
     console.error(err);
+    if (shouldFallbackToRedirect(err)) {
+      try {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      } catch (redirectErr) {
+        console.error(redirectErr);
+        setSyncStatus("ログイン失敗");
+        alert(`Googleログインに失敗しました。\n${redirectErr.message}`);
+        return;
+      }
+    }
     setSyncStatus("ログイン失敗");
     alert(`Googleログインに失敗しました。\n${err.message}`);
   }
+}
+
+function shouldFallbackToRedirect(err) {
+  return ["auth/popup-blocked", "auth/cancelled-popup-request", "auth/operation-not-supported-in-this-environment"].includes(err?.code);
 }
 
 async function logoutFromGoogle() {
